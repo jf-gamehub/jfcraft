@@ -13,8 +13,7 @@ class EntityLiving extends Entity {
         let found = false;
 
         for (let y = 255; y >= 0; y--) {
-            const key = `${tx},${y},${tz}`;
-            if (window.WorldData[key] && !window.WorldData[`${tx},${y + 1},${tz}`] && !window.WorldData[`${tx},${y + 2},${tz}`]) {
+            if (window.worldInstance.world.hasBlock(tx, y, tz) && !window.worldInstance.world.hasBlock(tx, y + 1, tz) && !window.worldInstance.world.hasBlock(tx, y + 2, tz)) {
                 ty = y + 1;
                 found = true;
                 break;

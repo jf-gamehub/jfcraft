@@ -81,7 +81,7 @@ window.Physics = {
         ];
         
         for(let pt of checkPoints) {
-            if (window.WorldData[`${Math.floor(pt.x)},${Math.floor(py - 1)},${Math.floor(pt.z)}`]) {
+            if (window.worldInstance.world.hasBlock(Math.floor(pt.x), Math.floor(py - 1), Math.floor(pt.z))) {
                 return true; // There is floor somewhere under us
             }
         }
@@ -101,7 +101,7 @@ window.Physics = {
         for (let x = minX; x <= maxX; x++) {
             for (let y = minY; y <= maxY; y++) {
                 for (let z = minZ; z <= maxZ; z++) {
-                    if (window.WorldData[`${x},${y},${z}`]) {
+                    if (window.worldInstance.world.hasBlock(x, y, z)) {
                         if (axis === 'y') {
                             if (p.velocity.y > 0) {
                                 p.position.y = y - this.PLAYER_HEIGHT - margin;

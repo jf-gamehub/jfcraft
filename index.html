@@ -67,6 +67,14 @@
         Speed: <span id="speed">0.00</span> bps
     </div>
 
+    <div id="seedControl" style="position: absolute; top: 0; right: 0; color: white; background: rgba(0,0,0,0.5); padding: 5px; z-index: 100; font-size: 14px;">
+        <label style="font-size: 14px;">
+            Seed:
+            <input id="worldSeedInput" type="text" placeholder="random or numeric" style="width: 140px; margin-left: 6px; font-size: 14px; color: white; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3);">
+        </label>
+        <button id="worldSeedButton" style="margin-left: 8px; font-size: 14px; padding: 2px 8px;">Generate</button>
+    </div>
+
     <input id="chatInput">
 
     <canvas id="game"></canvas>

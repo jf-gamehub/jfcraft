@@ -56,14 +56,69 @@ window.skyMesh.renderOrder = 2;
 // =========================
 // GAME WORLD & CHUNKING
 // =========================
+function parseSeed(value) {
+    if (value === undefined || value === null || value === "") {
+        return Math.floor(Math.random() * 4294967296) - 2147483648;
+    }
+    const asNumber = Number(value);
+    if (!Number.isNaN(asNumber) && Number.isFinite(asNumber)) {
+        return Math.floor(asNumber) | 0;
+    }
+
+    let hash = 0;
+    for (let i = 0; i < value.length; i++) {
+        hash = (hash * 31 + value.charCodeAt(i)) | 0;
+    }
+    return hash;
+}
+
 class GameWorld {
     constructor() {
-        window.WorldData = {};
-        this.seed = Math.floor(Math.random() * 4294967296) - 2147483648;
-        // This assumes you have the 'World' class defined in worldgen.js
-        this.world = new World(this.seed); 
-        this.renderDistance = 0; // 3x3 chunks
+        window.worldInstance = this;
+        this.renderDistance = 1; // 3x3 chunks
+        this.createSeedControls();
+        this.initializeWorld(parseSeed(''));
+    }
+
+    createSeedControls() {
+        this.seedInput = document.getElementById('worldSeedInput');
+        const seedButton = document.getElementById('worldSeedButton');
+        if (!this.seedInput || !seedButton) return;
+
+        seedButton.addEventListener('click', () => {
+            this.initializeWorld(parseSeed(this.seedInput.value));
+        });
+
+        this.seedInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                this.initializeWorld(parseSeed(this.seedInput.value));
+            }
+        });
+    }
+
+    initializeWorld(seed) {
+        this.seed = seed;
+        this.world = new World(this.seed);
+        if (this.seedInput) {
+            this.seedInput.value = String(this.seed);
+        }
+        this.clearWorldChunks();
         this.initSpawn();
+    }
+
+    clearWorldChunks() {
+        const toRemove = [];
+        window.scene.children.forEach(child => {
+            if (child.userData && Number.isInteger(child.userData.cx) && Number.isInteger(child.userData.cz)) {
+                toRemove.push(child);
+            }
+        });
+        toRemove.forEach(child => {
+            window.scene.remove(child);
+            child.traverse(node => {
+                if (node.geometry) node.geometry.dispose();
+            });
+        });
     }
 
     initSpawn() {
@@ -87,6 +142,8 @@ class GameWorld {
             window.scene.remove(oldChunk);
             oldChunk.children.forEach(c => { if(c.geometry) c.geometry.dispose(); });
         }
+        // Ensure the chunk data exists before building its mesh.
+        this.world.getChunk(cx, cz);
         const mesh = Block.generateChunkMesh(cx, cz);
         window.scene.add(mesh);
     }
@@ -122,24 +179,37 @@ window.addEventListener("click", () => {
 window.updateMeshArea = function(bx, bz) {
     const cx = Math.floor(bx / 16);
     const cz = Math.floor(bz / 16);
-    // Refresh 3x3 chunk area to update AO shadows on neighbors
-    for (let x = -1; x <= 1; x++) {
-        for (let z = -1; z <= 1; z++) {
-            window.worldInstance.refreshChunk(cx + x, cz + z);
-        }
+    const lx = ((bx % 16) + 16) % 16;
+    const lz = ((bz % 16) + 16) % 16;
+    const chunksToUpdate = new Set();
+    chunksToUpdate.add(`${cx},${cz}`);
+    if (lx === 0) {
+        chunksToUpdate.add(`${cx-1},${cz}`);
+        if (lz === 0) chunksToUpdate.add(`${cx-1},${cz-1}`);
+        if (lz === 15) chunksToUpdate.add(`${cx-1},${cz+1}`);
+    }
+    if (lx === 15) {
+        chunksToUpdate.add(`${cx+1},${cz}`);
+        if (lz === 0) chunksToUpdate.add(`${cx+1},${cz-1}`);
+        if (lz === 15) chunksToUpdate.add(`${cx+1},${cz+1}`);
+    }
+    if (lz === 0) chunksToUpdate.add(`${cx},${cz-1}`);
+    if (lz === 15) chunksToUpdate.add(`${cx},${cz+1}`);
+    for (const key of chunksToUpdate) {
+        const [x, z] = key.split(',').map(Number);
+        window.worldInstance.refreshChunk(x, z);
     }
 };
 
 window.breakBlock = function(bx, by, bz, playSound = true) {
-    const key = `${bx},${by},${bz}`;
-    if (!window.WorldData[key]) return;
-    delete window.WorldData[key];
+    if (!window.worldInstance.world.hasBlock(bx, by, bz)) return;
+    window.worldInstance.world.setBlock(bx, by, bz, 0);
     if (playSound) console.log("Block broke");
     window.updateMeshArea(bx, bz);
 };
 
 window.placeBlock = function(bx, by, bz, blockID = 3, playSound = true) {
-    window.WorldData[`${bx},${by},${bz}`] = { id: blockID };
+    window.worldInstance.world.setBlock(bx, by, bz, blockID);
     if (playSound) console.log("Block placed");
     window.updateMeshArea(bx, bz);
 };

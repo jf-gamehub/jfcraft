@@ -1,6 +1,7 @@
 const Block = {
     loader: new THREE.TextureLoader(),
     textures: {},
+
     init: function() {
         this.loader.setCrossOrigin('anonymous');
         const allPaths = [];
@@ -19,12 +20,8 @@ const Block = {
         });
     },
 
-    // HELPER: Convert world coordinates to chunk coordinates
     getChunkCoords: function(x, z) {
-        return {
-            cx: Math.floor(x / 16),
-            cz: Math.floor(z / 16)
-        };
+        return { cx: Math.floor(x / 16), cz: Math.floor(z / 16) };
     },
 
     NEIGHBORS: [
@@ -32,17 +29,24 @@ const Block = {
     ],
 
     getAO: function(x, y, z, s1Off, s2Off, cOff) {
-        const s1 = window.WorldData[`${x + s1Off[0]},${y + s1Off[1]},${z + s1Off[2]}`] ? 1 : 0;
-        const s2 = window.WorldData[`${x + s2Off[0]},${y + s2Off[1]},${z + s2Off[2]}`] ? 1 : 0;
-        const c = window.WorldData[`${x + cOff[0]},${y + cOff[1]},${z + cOff[2]}`] ? 1 : 0;
+        const s1 = this.hasBlockAt(x + s1Off[0], y + s1Off[1], z + s1Off[2]) ? 1 : 0;
+        const s2 = this.hasBlockAt(x + s2Off[0], y + s2Off[1], z + s2Off[2]) ? 1 : 0;
+        const c = this.hasBlockAt(x + cOff[0], y + cOff[1], z + cOff[2]) ? 1 : 0;
         if (s1 && s2) return 0;
         return 3 - (s1 + s2 + c);
+    },
+
+    hasBlockAt: function(x, y, z) {
+        return this.getBlockId(x, y, z) !== 0;
+    },
+
+    getBlockId: function(x, y, z) {
+        return window.worldInstance?.world?.getBlock(x, y, z) ?? 0;
     },
 
     getFaceAO: function(faceIdx, x, y, z) {
         const res = [];
         const check = (s1, s2, c) => this.getAO(x, y, z, s1, s2, c);
-        
         if (faceIdx === 0) { // Right (+X)
             res.push(check([1,-1,0],[1,0,1],[1,-1,1]), check([1,-1,0],[1,0,-1],[1,-1,-1]), check([1,1,0],[1,0,1],[1,1,1]), check([1,1,0],[1,0,-1],[1,1,-1]));
         } else if (faceIdx === 1) { // Left (-X)
@@ -66,10 +70,59 @@ const Block = {
         return !!def.tint[map[faceIdx]];
     },
 
+    createCombinedMaterial: function(basePath, overlayPath) {
+        const hasOverlay = overlayPath !== "none";
+        return new THREE.ShaderMaterial({
+            uniforms: {
+                uBase: { value: this.textures[basePath] },
+                uOverlay: { value: hasOverlay ? this.textures[overlayPath] : null },
+                uHasOverlay: { value: hasOverlay }
+            },
+            vertexColors: true,
+            transparent: true,
+            alphaTest: 0.1,
+            vertexShader: `
+                varying vec2 vUv;
+                varying vec3 vColor;
+                varying vec3 vTint;
+                attribute vec3 tint;
+                void main() {
+                    vUv = uv;
+                    vColor = color;
+                    vTint = tint;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D uBase;
+                uniform sampler2D uOverlay;
+                uniform bool uHasOverlay;
+                varying vec2 vUv;
+                varying vec3 vColor;
+                varying vec3 vTint;
+                void main() {
+                    vec4 baseTex = texture2D(uBase, vUv);
+                    vec4 finalColor = baseTex;
+                    if (uHasOverlay) {
+                        vec4 overTex = texture2D(uOverlay, vUv);
+                        vec3 tintedOverlay = overTex.rgb * vTint;
+                        finalColor.rgb = mix(finalColor.rgb, tintedOverlay, overTex.a);
+                        finalColor.a = max(finalColor.a, overTex.a);
+                    } else if (vTint != vec3(1.0)) {
+                        finalColor.rgb *= vTint;
+                    }
+                    gl_FragColor = vec4(finalColor.rgb * vColor, finalColor.a);
+                    if (gl_FragColor.a < 0.1) discard;
+                }
+            `
+        });
+    },
+
     generateChunkMesh: function(cx, cz) {
+        const world = window.worldInstance.world;
         const chunkGroup = new THREE.Group();
         chunkGroup.userData = { cx, cz };
-        chunkGroup.name = `chunk_${cx}_${cz}`; // Essential for finding/replacing
+        chunkGroup.name = `chunk_${cx}_${cz}`;
         
         const buckets = {};
         const biomeColor = new THREE.Color(Biomes.TYPES.PLAINS.color);
@@ -78,49 +131,47 @@ const Block = {
         for (let x = 0; x < 16; x++) {
             for (let z = 0; z < 16; z++) {
                 for (let y = 0; y < 256; y++) {
-                    const wx = cx * 16 + x, wz = cz * 16 + z;
-                    const id = window.WorldData[`${wx},${y},${wz}`]?.id ?? 0;
+                    const wx = cx * 16 + x;
+                    const wz = cz * 16 + z;
+                    const id = world.getBlock(wx, y, wz);
                     if (id === 0) continue;
-                    const def = window.BlockById[id];
 
+                    const def = window.BlockById[id];
                     this.NEIGHBORS.forEach((off, i) => {
-                        const nx = wx + off[0], ny = y + off[1], nz = wz + off[2];
-                        if (window.WorldData[`${nx},${ny},${nz}`]) return;
+                        const nx = wx + off[0];
+                        const ny = y + off[1];
+                        const nz = wz + off[2];
+                        
+                        if (world.hasBlock(nx, ny, nz)) return;
 
                         const tex = def.textures[i];
-                        const ovl = def.overlays ? def.overlays[i] : null;
+                        const ovl = (def.overlays && def.overlays[i]) ? def.overlays[i] : "none";
+                        const bucketKey = `${tex}|${ovl}`;
 
-                        [tex, ovl].forEach((path, isOvlIdx) => {
-                            if (!path) return;
-                            if (!buckets[path]) buckets[path] = { pos: [], col: [], uv: [], idx: [], vCount: 0 };
-                            this.addFaceToArrays(i, wx, y, wz, isOvlIdx === 1, buckets[path], def, biomeColor, brightness[i]);
-                        });
+                        if (!buckets[bucketKey]) {
+                            buckets[bucketKey] = { pos: [], col: [], tint: [], uv: [], idx: [], vCount: 0, tex, ovl };
+                        }
+                        this.addFaceToArrays(i, wx, y, wz, buckets[bucketKey], def, biomeColor, brightness[i]);
                     });
                 }
             }
         }
 
-        for (const path in buckets) {
-            const b = buckets[path];
+        for (const key in buckets) {
+            const b = buckets[key];
             const geo = new THREE.BufferGeometry();
             geo.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
             geo.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
+            geo.setAttribute('tint', new THREE.Float32BufferAttribute(b.tint, 3));
             geo.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
             geo.setIndex(b.idx);
-            const mat = new THREE.MeshBasicMaterial({ 
-                map: this.textures[path], 
-                vertexColors: true, 
-                transparent: true, 
-                alphaTest: 0.1 
-            });
-            chunkGroup.add(new THREE.Mesh(geo, mat));
+            chunkGroup.add(new THREE.Mesh(geo, this.createCombinedMaterial(b.tex, b.ovl)));
         }
         return chunkGroup;
     },
 
-    addFaceToArrays: function(faceIdx, x, y, z, isOverlay, bucket, def, biomeColor, brightnessVal) {
-        const offset = isOverlay ? 0.001 : 0;
-        const p = 0.5 + offset, n = -0.5 - offset;
+    addFaceToArrays: function(faceIdx, x, y, z, bucket, def, biomeColor, brightnessVal) {
+        const p = 0.5, n = -0.5;
         const faces = [
             [p,n,p, p,n,n, p,p,p, p,p,n], [n,n,n, n,n,p, n,p,n, n,p,p],
             [n,p,p, p,p,p, n,p,n, p,p,n], [n,n,n, p,n,n, n,n,p, p,n,p],
@@ -136,13 +187,16 @@ const Block = {
         const aoCurve = [0.4, 0.6, 0.8, 1.0];
 
         for (let i = 0; i < 4; i++) {
-            let c = (isOverlay || this.shouldTintFace(def, faceIdx)) ? biomeColor.clone() : new THREE.Color(0xffffff);
-            c.multiplyScalar(brightnessVal * aoCurve[aoLevels[i]]);
-            bucket.col.push(c.r, c.g, c.b);
+            const aoMult = brightnessVal * aoCurve[aoLevels[i]];
+            bucket.col.push(aoMult, aoMult, aoMult);
+            if (bucket.ovl !== "none" || this.shouldTintFace(def, faceIdx)) {
+                bucket.tint.push(biomeColor.r, biomeColor.g, biomeColor.b);
+            } else {
+                bucket.tint.push(1, 1, 1);
+            }
         }
 
         bucket.uv.push(0,0, 1,0, 0,1, 1,1);
-
         if (aoLevels[0] + aoLevels[3] < aoLevels[1] + aoLevels[2]) {
             bucket.idx.push(base, base + 1, base + 3, base, base + 3, base + 2);
         } else {

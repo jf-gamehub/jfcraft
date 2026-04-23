@@ -22,12 +22,12 @@ window.BlockRegistry = {
                 'assets/minecraft/textures/block/grass_block_side.png'
             ],
             overlays: [
-                'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/grass_block_side_overlay.png',
-                'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/grass_block_side_overlay.png',
+                'assets/minecraft/textures/block/grass_block_side_overlay.png',
+                'assets/minecraft/textures/block/grass_block_side_overlay.png',
                 null,
                 null,
-                'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/grass_block_side_overlay.png',
-                'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/grass_block_side_overlay.png'
+                'assets/minecraft/textures/block/grass_block_side_overlay.png',
+                'assets/minecraft/textures/block/grass_block_side_overlay.png'
             ]
         },
 
@@ -47,6 +47,26 @@ window.BlockRegistry = {
             tint: null,
             textures: Array(6).fill(
                 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/cobblestone.png'
+            ),
+            overlays: Array(6).fill(null)
+        },
+
+        STONE: {
+            blockID: 5,
+            opacity: 15,
+            tint: null,
+            textures: Array(6).fill(
+                'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/stone.png'
+            ),
+            overlays: Array(6).fill(null)
+        },
+
+        BEDROCK: {
+            blockID: 6,
+            opacity: 15,
+            tint: null,
+            textures: Array(6).fill(
+                'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/bedrock.png'
             ),
             overlays: Array(6).fill(null)
         }
