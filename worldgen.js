@@ -84,23 +84,34 @@ class Chunk {
     }
 
     generateData() {
-        const height = 99; // Flat world surface height
-        for (let x = 0; x < 16; x++) {
-            for (let z = 0; z < 16; z++) {
-                for (let y = 0; y <= height; y++) {
-                    let block = window.BlockRegistry.SOLID.STONE;
-                    if (y === height) {
-                        block = window.BlockRegistry.SOLID.GRASS;
-                    } else if (y > height - 5) {
-                        block = window.BlockRegistry.SOLID.DIRT;
-                    } else if (y === 0) {
-                        block = window.BlockRegistry.SOLID.BEDROCK;
-                    }
-                    this.setBlock(x, y, z, block.blockID);
+    const height = 99; // Flat world surface height
+    
+    // Look up the blocks using the new string keys
+    const stone = window.BlockRegistry.SOLID["stone"];
+    const grass = window.BlockRegistry.SOLID["grass_block"];
+    const dirt = window.BlockRegistry.SOLID["dirt"];
+    const bedrock = window.BlockRegistry.SOLID["bedrock"];
+
+    for (let x = 0; x < 16; x++) {
+        for (let z = 0; z < 16; z++) {
+            for (let y = 0; y <= height; y++) {
+                let block = stone; // Default to stone
+
+                if (y === height) {
+                    block = grass;
+                } else if (y > height - 5) {
+                    block = dirt;
+                } else if (y === 0) {
+                    block = bedrock;
                 }
+
+                // Use the blockID from the found block object
+                this.setBlock(x, y, z, block.blockID);
             }
         }
     }
+}
+
 }
 
 // ==============================

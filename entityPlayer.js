@@ -138,7 +138,7 @@ placeBlock() {
     ) return;
 
     // 🔥 NEW: use registry instead of string
-    const block = window.BlockRegistry.SOLID.COBBLESTONE;
+    const block = window.BlockRegistry.SOLID["crafting_table"]; // Example: always place crafting table for now
 
     window.placeBlock(bx, by, bz, block.blockID, true);
 }

@@ -170,7 +170,7 @@ function animate() {
     window.camera.fov = THREE.MathUtils.lerp(window.camera.fov, targetFOV, 1 - Math.exp(-10 * dt));
     window.camera.updateProjectionMatrix();
 
-    
+    if (window.hud) window.hud.render();
 
     window.renderer.clear();
     window.renderer.render(window.scene, window.camera);

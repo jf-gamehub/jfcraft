@@ -13,14 +13,12 @@ class UIPair {
 class GameMenu {
     constructor() {
         this.visible = false;
-        this.inMenu = false;
         this.buttons = [];
         this.mouseX = 0;
         this.mouseY = 0;
-
         this.canvas = document.createElement("canvas");
         this.ctx = this.canvas.getContext("2d");
-
+        
         Object.assign(this.canvas.style, {
             position: "fixed",
             left: "0",
@@ -32,8 +30,8 @@ class GameMenu {
             pointerEvents: "none",
             imageRendering: "pixelated"
         });
-
         document.body.appendChild(this.canvas);
+
         this.setupInput();
         this.createButtons();
         this.resizeCanvas();
@@ -47,6 +45,7 @@ class GameMenu {
     }
 
     setupInput() {
+        // We only listen for the error/cooldown here
         document.addEventListener("pointerlockerror", () => {
             console.warn("Pointer lock blocked by browser cooldown. Retrying in 3s...");
             setTimeout(() => {
@@ -57,20 +56,15 @@ class GameMenu {
             }, 3000);
         });
 
-        document.addEventListener("pointerlockchange", () => {
-            const isLocked = document.pointerLockElement !== null;
-            if (!isLocked && !this.visible) this.show();
-        });
+        // The logic for SHOWING the menu is now in inventory.js 
+        // via the document pointerlockchange listener.
 
         this.canvas.addEventListener("mousedown", (e) => {
             if (!this.visible) return;
-
             const rect = this.canvas.getBoundingClientRect();
             const mouse = window.uiManager.mouse(e, rect);
-
             for (let item of this.buttons) {
                 if (!item) continue;
-
                 if (item instanceof UIPair) {
                     if (item.btnLeft.contains(mouse.x, mouse.y)) item.btnLeft.onClick();
                     if (item.btnRight.contains(mouse.x, mouse.y)) item.btnRight.onClick();
@@ -91,46 +85,29 @@ class GameMenu {
     createButtons() {
         this.buttons = [
             new UIButton({ text: "Back to Game", width: 200, onClick: () => this.hide() }),
-
             new UIPair(
                 new UIButton({ text: "Achievements", width: 98, disabled: true }),
                 new UIButton({ text: "Statistics", width: 98 }),
                 4
             ),
-
             null,
-
             new UIPair(
-                new UIButton({
-                    text: "Options...",
-                    width: 98,
-                    onClick: () => {
-                        this.deactivate();
-                        window.optionsMenu.show();
-                    }
-                }),
+                new UIButton({ text: "Options...", width: 98, onClick: () => { this.deactivate(); window.optionsMenu.show(); } }),
                 new UIButton({ text: "Invite", width: 98, disabled: true }),
                 4
             ),
-
-            new UIButton({
-                text: "Save and Quit to Title",
-                width: 200,
-                onClick: () => location.reload()
-            })
+            new UIButton({ text: "Save and Quit to Title", width: 200, onClick: () => location.reload() })
         ];
     }
 
     show() {
         this.visible = true;
-        this.inMenu = true;
         this.canvas.style.display = "block";
         this.canvas.style.pointerEvents = "auto";
     }
 
     deactivate() {
         this.visible = false;
-        this.inMenu = false;
         this.canvas.style.display = "none";
         this.canvas.style.pointerEvents = "none";
     }
@@ -144,10 +121,11 @@ class GameMenu {
     loop() {
         requestAnimationFrame(() => this.loop());
         if (!this.visible) return;
-
+        
         const { ctx, canvas, buttons } = this;
-
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Background Tint
         ctx.fillStyle = "rgba(0, 0, 0, 0.627)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -155,38 +133,28 @@ class GameMenu {
         const startY = window.uiManager.centerY(canvas.height) + 9;
         let currentRow = 0;
 
-        const mouseX = this.mouseX;
-        const mouseY = this.mouseY;
-
         buttons.forEach((item) => {
-            if (item === null) {
-                currentRow++;
-                return;
-            }
-
+            if (item === null) { currentRow++; return; }
             const y = Math.floor(startY + (currentRow * 24));
-
+            
             if (item instanceof UIPair) {
                 const total = item.btnLeft.width + item.pairGap + item.btnRight.width;
                 const startX = centerX - total / 2;
-
                 item.btnLeft.x = Math.floor(startX);
                 item.btnLeft.y = y;
-
                 item.btnRight.x = Math.floor(startX + item.btnLeft.width + item.pairGap);
                 item.btnRight.y = y;
-
+                
                 [item.btnLeft, item.btnRight].forEach(b => {
-                    b.setHover(b.contains(mouseX, mouseY));
+                    b.setHover(b.contains(this.mouseX, this.mouseY));
                     b.draw(ctx);
                 });
             } else {
                 item.x = Math.floor(centerX - item.width / 2);
                 item.y = y;
-                item.setHover(item.contains(mouseX, mouseY));
+                item.setHover(item.contains(this.mouseX, this.mouseY));
                 item.draw(ctx);
             }
-
             currentRow++;
         });
     }

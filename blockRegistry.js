@@ -1,6 +1,6 @@
 window.BlockRegistry = {
     AIR: {
-        AIR: {
+        "air": {
             blockID: 0,
             opacity: 15,
             textures: [null, null, null, null, null, null],
@@ -10,7 +10,17 @@ window.BlockRegistry = {
     },
 
     SOLID: {
-        GRASS: {
+        "stone": {
+            blockID: 1,
+            opacity: 15,
+            tint: null,
+            textures: Array(6).fill(
+                'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/stone.png'
+            ),
+            overlays: Array(6).fill(null)
+        },
+
+        "grass_block": {
             blockID: 2,
             opacity: 15,
             tint: { top: true },
@@ -32,7 +42,7 @@ window.BlockRegistry = {
             ]
         },
 
-        DIRT: {
+        "dirt": {
             blockID: 3,
             opacity: 15,
             tint: null,
@@ -42,7 +52,7 @@ window.BlockRegistry = {
             overlays: Array(6).fill(null)
         },
 
-        COBBLESTONE: {
+        "cobblestone": {
             blockID: 4,
             opacity: 15,
             tint: null,
@@ -52,23 +62,37 @@ window.BlockRegistry = {
             overlays: Array(6).fill(null)
         },
 
-        STONE: {
+        "oak_planks": {
             blockID: 5,
             opacity: 15,
             tint: null,
             textures: Array(6).fill(
-                'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/stone.png'
+                'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/oak_planks.png'
             ),
             overlays: Array(6).fill(null)
         },
 
-        BEDROCK: {
-            blockID: 6,
+        "bedrock": {
+            blockID: 7,
             opacity: 15,
             tint: null,
             textures: Array(6).fill(
                 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/bedrock.png'
             ),
+            overlays: Array(6).fill(null)
+        },
+
+        "crafting_table": {
+            blockID: 58,
+            opacity: 15,
+            textures: [
+                'assets/minecraft/textures/block/crafting_table_front.png',
+                'assets/minecraft/textures/block/crafting_table_side.png',
+                'assets/minecraft/textures/block/crafting_table_top.png',
+                'assets/minecraft/textures/block/oak_planks.png',
+                'assets/minecraft/textures/block/crafting_table_side.png',
+                'assets/minecraft/textures/block/crafting_table_side.png'
+            ],
             overlays: Array(6).fill(null)
         }
     }
