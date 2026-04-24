@@ -2,6 +2,7 @@ window.BlockRegistry = {
     AIR: {
         AIR: {
             blockID: 0,
+            opacity: 15,
             textures: [null, null, null, null, null, null],
             overlays: [null, null, null, null, null, null],
             tint: null

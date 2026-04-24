@@ -103,6 +103,52 @@ class Chunk {
     }
 }
 
+// ==============================
+// 1.18-STYLE CAVE DENSITY FIELD
+// ==============================
+
+function hash3(x, y, z) {
+    return Math.sin(x * 374761393 + y * 668265263 + z * 1442695041) * 43758.5453 % 1;
+}
+
+function noise3(x, y, z) {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const zi = Math.floor(z);
+
+    const xf = x - xi;
+    const yf = y - yi;
+    const zf = z - zi;
+
+    function n(x, y, z) {
+        return hash3(x, y, z);
+    }
+
+    const n000 = n(xi, yi, zi);
+    const n100 = n(xi + 1, yi, zi);
+    const n010 = n(xi, yi + 1, zi);
+    const n110 = n(xi + 1, yi + 1, zi);
+
+    const n001 = n(xi, yi, zi + 1);
+    const n101 = n(xi + 1, yi, zi + 1);
+    const n011 = n(xi, yi + 1, zi + 1);
+    const n111 = n(xi + 1, yi + 1, zi + 1);
+
+    const u = xf * xf * (3 - 2 * xf);
+    const v = yf * yf * (3 - 2 * yf);
+    const w = zf * zf * (3 - 2 * zf);
+
+    const x00 = n000 + (n100 - n000) * u;
+    const x10 = n010 + (n110 - n010) * u;
+    const x01 = n001 + (n101 - n001) * u;
+    const x11 = n011 + (n111 - n011) * u;
+
+    const y0 = x00 + (x10 - x00) * v;
+    const y1 = x01 + (x11 - x01) * v;
+
+    return y0 + (y1 - y0) * w;
+}
+
 // ============================================================
 // Chunk Generator
 // ============================================================
@@ -114,7 +160,7 @@ class ChunkGenerator {
     generateChunk(chunkX, chunkZ) {
         const chunk = new Chunk(chunkX, chunkZ);
         chunk.generateData();
-        this.carveCavesInChunk(chunk);
+        this.generateCaves(chunk);
         return chunk;
     }
 
@@ -125,99 +171,44 @@ class ChunkGenerator {
         return new SeededRandom((BigInt(chunkX) * a + BigInt(chunkZ) * b) ^ this.seed);
     }
 
-    carveCavesInChunk(chunk) {
-        for (let dx = -1; dx <= 1; dx++) {
-            for (let dz = -1; dz <= 1; dz++) {
-                const sourceX = chunk.chunkX + dx;
-                const sourceZ = chunk.chunkZ + dz;
-                const rand = this.createChunkRandom(sourceX, sourceZ);
-                this.generateCaveSystems(rand, sourceX, sourceZ, chunk);
-            }
-        }
-    }
+    generateCaves(chunk) {
+    const scale = 0.015;
+    const caveThreshold = 0.55;
 
-    generateCaveSystems(rand, chunkX, chunkZ, chunk) {
-        const caveCount = rand.nextInt(rand.nextInt(15) + 1);
-        for (let i = 0; i < caveCount; i++) {
-            const startX = chunkX * 16 + rand.nextInt(16);
-            const startY = rand.nextInt(rand.nextInt(120) + 8);
-            const startZ = chunkZ * 16 + rand.nextInt(16);
+    for (let x = 0; x < 16; x++) {
+        for (let z = 0; z < 16; z++) {
+            for (let y = 0; y < 256; y++) {
 
-            let branches = 1;
-            if (rand.nextInt(4) === 0) {
-                this.carveTunnel(rand, chunk, startX, startY, startZ, 1.0 + rand.nextDouble() * 6.0, 0, 0, 0, -1, 1.0);
-                branches += rand.nextInt(4);
-            }
+                const wx = chunk.chunkX * 16 + x;
+                const wz = chunk.chunkZ * 16 + z;
 
-            for (let j = 0; j < branches; j++) {
-                const yaw = rand.nextFloat() * Math.PI * 2.0;
-                const pitch = (rand.nextFloat() - 0.5) * 2.0 / 8.0;
-                let radius = rand.nextFloat() * 2.0 + rand.nextFloat();
-                if (rand.nextInt(10) === 0) {
-                    radius *= rand.nextFloat() * rand.nextFloat() * 3.0 + 1.0;
-                }
-                this.carveTunnel(rand, chunk, startX, startY, startZ, radius * 2.0, yaw, pitch, 0, -1, 1.0);
-            }
-        }
-    }
+                // 1. terrain bias (keeps surface solid)
+                let heightBias = (y - 64) * 0.08;
 
-    carveTunnel(rand, chunk, x, y, z, radius, yaw, pitch, step, maxSteps, verticalScale) {
-        if (maxSteps < 0) {
-            maxSteps = Math.floor(8.0 + rand.nextDouble() * 32.0);
-        }
+                // 2. main cave noise (big blobs)
+                let caves = noise3(wx * scale, y * scale, wz * scale);
 
-        const branchAt = Math.floor(maxSteps / 2);
-        let branched = false;
+                // 3. spaghetti tunnels (thin noise)
+                let spaghetti = Math.abs(noise3(wx * 0.03, y * 0.03, wz * 0.03));
 
-        for (; step < maxSteps; step++) {
-            const progress = step / maxSteps;
-            const width = 1.5 + Math.sin(Math.PI * progress) * radius;
-            const heightRadius = width * verticalScale;
-            this.carveEllipse(chunk, x, y, z, width, heightRadius, width);
+                // 4. ravines (long cuts)
+                let ravine = noise3(wx * 0.002, 0, wz * 0.002);
+                let ravineShape = Math.max(0, 1 - Math.abs(y - 64) * 0.02);
 
-            x += Math.cos(pitch) * Math.cos(yaw);
-            y += Math.sin(pitch);
-            z += Math.cos(pitch) * Math.sin(yaw);
+                let density =
+                    heightBias +
+                    caves * 1.2 +
+                    (1 - spaghetti) * 0.8 +
+                    ravine * ravineShape * 2.0;
 
-            pitch *= 0.7;
-            pitch += (rand.nextFloat() - rand.nextFloat()) * 0.05;
-            yaw += (rand.nextFloat() - rand.nextFloat()) * 0.1;
-
-            if (!branched && step === branchAt && radius > 1.0) {
-                branched = true;
-                this.carveTunnel(rand, chunk, x, y, z, radius * 0.75, yaw + Math.PI / 2, pitch * 0.5, step, maxSteps, verticalScale);
-                this.carveTunnel(rand, chunk, x, y, z, radius * 0.75, yaw - Math.PI / 2, pitch * 0.5, step, maxSteps, verticalScale);
-            }
-        }
-    }
-
-    carveEllipse(chunk, centerX, centerY, centerZ, rx, ry, rz) {
-        const minX = Math.floor(centerX - rx) - 1;
-        const maxX = Math.floor(centerX + rx) + 1;
-        const minY = Math.floor(centerY - ry) - 1;
-        const maxY = Math.floor(centerY + ry) + 1;
-        const minZ = Math.floor(centerZ - rz) - 1;
-        const maxZ = Math.floor(centerZ + rz) + 1;
-
-        const invRx = 1.0 / (rx * rx);
-        const invRy = 1.0 / (ry * ry);
-        const invRz = 1.0 / (rz * rz);
-
-        for (let wx = minX; wx <= maxX; wx++) {
-            for (let wy = minY; wy <= maxY; wy++) {
-                if (wy < 0 || wy >= 256) continue;
-                for (let wz = minZ; wz <= maxZ; wz++) {
-                    const dx = wx + 0.5 - centerX;
-                    const dy = wy + 0.5 - centerY;
-                    const dz = wz + 0.5 - centerZ;
-                    const distance = (dx * dx) * invRx + (dy * dy) * invRy + (dz * dz) * invRz;
-                    if (distance < 1.0) {
-                        chunk.setWorldBlock(wx, wy, wz, 0);
-                    }
+                // carve condition (THIS replaces all carving)
+                if (density < caveThreshold) {
+                    chunk.setWorldBlock(wx, y, wz, 0);
                 }
             }
         }
     }
+}
 }
 
 // ============================================================
