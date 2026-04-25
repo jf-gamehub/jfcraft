@@ -1,7 +1,9 @@
 // tick.js
+
 let lastTickTime = performance.now();
 let lastRenderTime = performance.now();
-const TICK_RATE = 50;
+
+const TICK_RATE = 50; // ms per tick (20 TPS)
 const baseFOV = 90;
 const sprintMultiplier = 1.1;
 
@@ -10,12 +12,12 @@ window.worldTime = 23000;
 
 // --- CONFIGURATION ---
 const WORLD_CONFIG = {
-    sunsetStart: 10000,   // Sun is ~6 degrees above, starts dropping
-    sunsetMid:   12000,   // Sun is ~6 degrees below, orange peak
-    sunsetEnd:   14000,   // Night transition complete
-    sunriseStart: 22000,  // Night starts fading to red
-    sunriseMid:   23000,  // Sun is ~6 degrees below, rising
-    sunriseEnd:   24000   // Sun is ~6 degrees above (Time 0)
+    sunsetStart: 10000,
+    sunsetMid:   12000,
+    sunsetEnd:   14000,
+    sunriseStart: 22000,
+    sunriseMid:   23000,
+    sunriseEnd:   24000
 };
 
 // Colors
@@ -25,7 +27,7 @@ const NIGHT_COLOR = new THREE.Color(0x000000);
 const SUNSET_ORANGE = new THREE.Color(0xff7044);
 const SUNSET_RED = new THREE.Color(0xff4422);
 
-// Initialize Sun Mesh
+// Sun setup
 const sunLoader = new THREE.TextureLoader();
 const sunTex = sunLoader.load('assets/minecraft/textures/environment/sun.png');
 sunTex.magFilter = THREE.NearestFilter;
@@ -45,6 +47,7 @@ window.sunMesh = new THREE.Mesh(sunGeo, sunMat);
 window.sunMesh.renderOrder = 1;
 window.scene.add(window.sunMesh);
 
+// NPCs
 window.npcs = [];
 window.npcs.push(new EntityNPC());
 
@@ -57,6 +60,7 @@ function updateUI() {
 
     let yaw = player.yaw % (Math.PI * 2);
     if (yaw < 0) yaw += Math.PI * 2;
+
     const directions = ['South', 'East', 'North', 'West'];
     const index = Math.round(yaw / (Math.PI / 2)) % 4;
 
@@ -71,48 +75,95 @@ function updateUI() {
 }
 
 // --------------------------------------------------
-// GAME TICK LOOP
+// 🔥 FIXED TIMESTEP LOOP (NO MORE DRIFT)
 // --------------------------------------------------
-setInterval(() => {
-    if (window.playerEntity) {
-        window.playerEntity.tick();
-        window.npcs.forEach(npc => npc.tick(window.world));
+
+let accumulator = 0;
+const FIXED_DT = TICK_RATE;
+
+function gameLoop() {
+    const now = performance.now();
+    let frameTime = now - lastTickTime;
+
+    // prevent spiral of death
+    if (frameTime > 100) frameTime = 100;
+
+    lastTickTime = now;
+    accumulator += frameTime;
+
+    while (accumulator >= FIXED_DT) {
+
+        // === GAME TICK ===
+        if (window.playerEntity) {
+            window.playerEntity.tick(window.world);
+            window.npcs.forEach(npc => npc.tick(window.world));
+        }
+
+        // Advance time
+        window.worldTime = (window.worldTime + 1) % 24000;
+
+        if (window.hud && window.player) {
+            hud.update(player);
+        }
+
+        accumulator -= FIXED_DT;
     }
 
-    // 1. Advance Time
-    window.worldTime = (window.worldTime + 1) % 24000;
+    const partialTick = accumulator / FIXED_DT;
 
-    if (window.hud && window.player) {
-    hud.update(player);
+    render(partialTick);
+    requestAnimationFrame(gameLoop);
 }
 
-    // 2. Sky Color Logic
-    const vT = window.worldTime; 
+// --------------------------------------------------
+// 🎨 RENDER
+// --------------------------------------------------
+
+function render(partialTick) {
+    const player = window.playerEntity;
+    if (!player || !window.renderer) return;
+
+    const now = performance.now();
+    const dt = (now - lastRenderTime) / 1000;
+    lastRenderTime = now;
+
+    // Player + NPC interpolation
+    player.renderUpdate(partialTick);
+    window.npcs.forEach(npc => npc.renderUpdate(partialTick));
+
+    // Sky follows camera
+    if (window.skyMesh && window.skyMat) {
+        window.skyMesh.position.copy(window.camera.position);
+        window.skyMat.uniforms.cameraY.value = window.camera.position.y;
+    }
+
+    // Sky color logic
+    const vT = window.worldTime;
     let topTarget = new THREE.Color();
     let botTarget = new THREE.Color();
 
-    if (vT >= 0 && vT < WORLD_CONFIG.sunsetStart) {
+    if (vT < WORLD_CONFIG.sunsetStart) {
         topTarget.copy(DAY_TOP);
         botTarget.copy(DAY_BOTTOM);
-    } else if (vT >= WORLD_CONFIG.sunsetStart && vT < WORLD_CONFIG.sunsetMid) {
-        let alpha = (vT - WORLD_CONFIG.sunsetStart) / (WORLD_CONFIG.sunsetMid - WORLD_CONFIG.sunsetStart);
-        topTarget.copy(DAY_TOP).lerp(SUNSET_ORANGE, alpha);
-        botTarget.copy(DAY_BOTTOM).lerp(NIGHT_COLOR, alpha);
-    } else if (vT >= WORLD_CONFIG.sunsetMid && vT < WORLD_CONFIG.sunsetEnd) {
-        let alpha = (vT - WORLD_CONFIG.sunsetMid) / (WORLD_CONFIG.sunsetEnd - WORLD_CONFIG.sunsetMid);
-        topTarget.copy(SUNSET_ORANGE).lerp(NIGHT_COLOR, alpha);
+    } else if (vT < WORLD_CONFIG.sunsetMid) {
+        let a = (vT - WORLD_CONFIG.sunsetStart) / (WORLD_CONFIG.sunsetMid - WORLD_CONFIG.sunsetStart);
+        topTarget.copy(DAY_TOP).lerp(SUNSET_ORANGE, a);
+        botTarget.copy(DAY_BOTTOM).lerp(NIGHT_COLOR, a);
+    } else if (vT < WORLD_CONFIG.sunsetEnd) {
+        let a = (vT - WORLD_CONFIG.sunsetMid) / (WORLD_CONFIG.sunsetEnd - WORLD_CONFIG.sunsetMid);
+        topTarget.copy(SUNSET_ORANGE).lerp(NIGHT_COLOR, a);
         botTarget.copy(NIGHT_COLOR);
-    } else if (vT >= WORLD_CONFIG.sunsetEnd && vT < WORLD_CONFIG.sunriseStart) {
+    } else if (vT < WORLD_CONFIG.sunriseStart) {
         topTarget.copy(NIGHT_COLOR);
         botTarget.copy(NIGHT_COLOR);
-    } else if (vT >= WORLD_CONFIG.sunriseStart && vT < WORLD_CONFIG.sunriseMid) {
-        let alpha = (vT - WORLD_CONFIG.sunriseStart) / (WORLD_CONFIG.sunriseMid - WORLD_CONFIG.sunriseStart);
-        topTarget.copy(NIGHT_COLOR).lerp(SUNSET_RED, alpha);
+    } else if (vT < WORLD_CONFIG.sunriseMid) {
+        let a = (vT - WORLD_CONFIG.sunriseStart) / (WORLD_CONFIG.sunriseMid - WORLD_CONFIG.sunriseStart);
+        topTarget.copy(NIGHT_COLOR).lerp(SUNSET_RED, a);
         botTarget.copy(NIGHT_COLOR);
     } else {
-        let alpha = (vT - WORLD_CONFIG.sunriseMid) / (WORLD_CONFIG.sunriseEnd - WORLD_CONFIG.sunriseMid);
-        topTarget.copy(SUNSET_RED).lerp(DAY_TOP, alpha);
-        botTarget.copy(NIGHT_COLOR).lerp(DAY_BOTTOM, alpha);
+        let a = (vT - WORLD_CONFIG.sunriseMid) / (WORLD_CONFIG.sunriseEnd - WORLD_CONFIG.sunriseMid);
+        topTarget.copy(SUNSET_RED).lerp(DAY_TOP, a);
+        botTarget.copy(NIGHT_COLOR).lerp(DAY_BOTTOM, a);
     }
 
     if (window.skyMat) {
@@ -120,65 +171,49 @@ setInterval(() => {
         window.skyMat.uniforms.bottomColor.value.copy(botTarget);
     }
 
-    // 3. 1:1 Minecraft 1.12.2 Sun Positioning
-        // 3. 1:1 Minecraft 1.12.2 Sun Positioning
+    // Sun positioning
     if (window.sunMesh && window.camera) {
-        // This ensures at tick 0, the angle is 0 (East) 
-        // and at tick 12000, the angle is PI (West)
         let sunAngle = (window.worldTime / 12000) * Math.PI;
-
         const distance = 150;
-        const pitchOffset = 0.1; // ~6 degrees in radians
+        const pitchOffset = 0.1;
 
-        // Math.sin(sunAngle) will be 0 at tick 0 and 12000.
-        // We add the pitchOffset so it sits just above the horizon at those times.
         window.sunMesh.position.set(
             window.camera.position.x - Math.cos(sunAngle) * distance,
             window.camera.position.y + (Math.sin(sunAngle) + pitchOffset) * distance,
             window.camera.position.z
         );
+
         window.sunMesh.lookAt(window.camera.position);
     }
 
-
-    lastTickTime = performance.now();
-}, TICK_RATE);
-
-// --------------------------------------------------
-// RENDER LOOP
-// --------------------------------------------------
-function animate() {
-    requestAnimationFrame(animate);
-    const player = window.playerEntity;
-    if (!player || !window.renderer) return;
-
-    const now = performance.now();
-    let partialTick = Math.min((now - lastTickTime) / TICK_RATE, 1.0);
-
-    window.playerEntity.renderUpdate(partialTick);
-    window.npcs.forEach(npc => npc.renderUpdate(partialTick));
-
-    const dt = (now - lastRenderTime) / 1000;
-    lastRenderTime = now;
-
-    if (window.skyMesh && window.skyMat) {
-        window.skyMesh.position.copy(window.camera.position);
-        window.skyMat.uniforms.cameraY.value = window.camera.position.y;
-    }
-
+    // FOV smoothing (sprinting)
     const targetFOV = player.sprinting ? (baseFOV * sprintMultiplier) : baseFOV;
-    window.camera.fov = THREE.MathUtils.lerp(window.camera.fov, targetFOV, 1 - Math.exp(-10 * dt));
+    window.camera.fov = THREE.MathUtils.lerp(
+        window.camera.fov,
+        targetFOV,
+        1 - Math.exp(-10 * dt)
+    );
     window.camera.updateProjectionMatrix();
 
     if (window.hud) window.hud.render();
 
+    // Render pipeline
     window.renderer.clear();
     window.renderer.render(window.scene, window.camera);
     window.renderer.clearDepth();
-    if (window.uiScene && window.uiCam) window.renderer.render(window.uiScene, window.uiCam);
+
+    if (window.uiScene && window.uiCam) {
+        window.renderer.render(window.uiScene, window.uiCam);
+    }
+
     updateUI();
 }
 
-animate();
+// --------------------------------------------------
+// 🚀 START
+// --------------------------------------------------
+
 window.playerEntity = new EntityPlayer();
 window.playerController = new ControlPlayer(window.playerEntity);
+
+gameLoop();

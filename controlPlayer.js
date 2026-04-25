@@ -9,6 +9,7 @@ class ControlPlayer {
         this.camera = window.camera;
 
         this.initInput();
+        this.sensitivity = 0.8; // 0 → 1 (like Minecraft)
     }
 
     initInput() {
@@ -77,29 +78,39 @@ class ControlPlayer {
         });
 
         document.addEventListener('mousemove', (e) => {
-            const isLocked = document.pointerLockElement === window.canvas;
-            const menuOpen = window.gameMenu && window.gameMenu.inMenu;
+    const isLocked = document.pointerLockElement === window.canvas;
+    const menuOpen = window.gameMenu && window.gameMenu.inMenu;
 
-            if (isLocked && !menuOpen) {
-                const maxHeadYaw = 35 * Math.PI / 180;
-                this.entity.headYaw -= e.movementX * 0.002;
+    if (isLocked && !menuOpen) {
 
-                if (this.entity.headYaw > maxHeadYaw) {
-                    this.entity.yaw += this.entity.headYaw - maxHeadYaw;
-                    this.entity.headYaw = maxHeadYaw;
-                } else if (this.entity.headYaw < -maxHeadYaw) {
-                    this.entity.yaw += this.entity.headYaw + maxHeadYaw;
-                    this.entity.headYaw = -maxHeadYaw;
-                }
+        // === MC sensitivity curve ===
+        const sens = this.sensitivity;
+        const f = sens * 0.6 + 0.2;
+        const multiplier = f * f * f * 8.0;
 
-                this.entity.pitch -= e.movementY * 0.002;
+        const dx = e.movementX * multiplier * 0.002;
+        const dy = e.movementY * multiplier * 0.002;
 
-                this.entity.pitch = Math.max(
-                    -Math.PI / 2 + 0.01,
-                    Math.min(Math.PI / 2 - 0.01, this.entity.pitch)
-                );
-            }
-        });
+        const maxHeadYaw = 35 * Math.PI / 180;
+
+        this.entity.headYaw -= dx;
+
+        if (this.entity.headYaw > maxHeadYaw) {
+            this.entity.yaw += this.entity.headYaw - maxHeadYaw;
+            this.entity.headYaw = maxHeadYaw;
+        } else if (this.entity.headYaw < -maxHeadYaw) {
+            this.entity.yaw += this.entity.headYaw + maxHeadYaw;
+            this.entity.headYaw = -maxHeadYaw;
+        }
+
+        this.entity.pitch -= dy;
+
+        this.entity.pitch = Math.max(
+            -Math.PI / 2 + 0.01,
+            Math.min(Math.PI / 2 - 0.01, this.entity.pitch)
+        );
+    }
+});
 
         window.addEventListener('contextmenu', (e) => e.preventDefault());
 

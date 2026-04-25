@@ -3,6 +3,7 @@ window.BlockRegistry = {
         "air": {
             blockID: 0,
             opacity: 15,
+            interactable: false,
             textures: [null, null, null, null, null, null],
             overlays: [null, null, null, null, null, null],
             tint: null
@@ -13,6 +14,7 @@ window.BlockRegistry = {
         "stone": {
             blockID: 1,
             opacity: 15,
+            interactable: false,
             tint: null,
             textures: Array(6).fill(
                 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/stone.png'
@@ -23,6 +25,7 @@ window.BlockRegistry = {
         "grass_block": {
             blockID: 2,
             opacity: 15,
+            interactable: false,
             tint: { top: true },
             textures: [
                 'assets/minecraft/textures/block/grass_block_side.png',
@@ -45,6 +48,7 @@ window.BlockRegistry = {
         "dirt": {
             blockID: 3,
             opacity: 15,
+            interactable: false,
             tint: null,
             textures: Array(6).fill(
                 'assets/minecraft/textures/block/dirt.png'
@@ -55,6 +59,7 @@ window.BlockRegistry = {
         "cobblestone": {
             blockID: 4,
             opacity: 15,
+            interactable: false,
             tint: null,
             textures: Array(6).fill(
                 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/cobblestone.png'
@@ -65,6 +70,7 @@ window.BlockRegistry = {
         "oak_planks": {
             blockID: 5,
             opacity: 15,
+            interactable: false,
             tint: null,
             textures: Array(6).fill(
                 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/oak_planks.png'
@@ -75,6 +81,7 @@ window.BlockRegistry = {
         "bedrock": {
             blockID: 7,
             opacity: 15,
+            interactable: false,
             tint: null,
             textures: Array(6).fill(
                 'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.20/assets/minecraft/textures/block/bedrock.png'
@@ -85,6 +92,8 @@ window.BlockRegistry = {
         "crafting_table": {
             blockID: 58,
             opacity: 15,
+            interactable: true,
+            tint: null,
             textures: [
                 'assets/minecraft/textures/block/crafting_table_front.png',
                 'assets/minecraft/textures/block/crafting_table_side.png',

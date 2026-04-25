@@ -15,6 +15,8 @@ class EntityPlayer extends EntityLiving {
         this.headYaw = 0;
         this.perspective = 'firstPerson';
         this.keys = {};
+        this.eyeHeight = 1.62;
+this.prevEyeHeight = 1.62;
 
         window.camera.rotation.order = 'YXZ';
         window.camera.rotation.set(this.pitch, this.yaw, 0);
@@ -138,7 +140,7 @@ placeBlock() {
     ) return;
 
     // 🔥 NEW: use registry instead of string
-    const block = window.BlockRegistry.SOLID["crafting_table"]; // Example: always place crafting table for now
+    const block = window.BlockRegistry.SOLID["oak_planks"]; // Example: always place crafting table for now
 
     window.placeBlock(bx, by, bz, block.blockID, true);
 }
@@ -150,7 +152,11 @@ placeBlock() {
             partialTick
         );
 
-        const eyeHeight = this.crouching ? 1.54 : 1.62;
+        const eyeHeight = THREE.MathUtils.lerp(
+    this.prevEyeHeight,
+    this.eyeHeight,
+    partialTick
+);
         const headPos = lerp.clone();
         headPos.y += eyeHeight;
 
@@ -220,6 +226,7 @@ if (this.handPivot) {
     tick(world) {
 
         
+        
         this.prevPosition.copy(this.position);
 
         if (this.leftClicking && this.breakCooldown <= 0) {
@@ -248,6 +255,11 @@ if (this.rightClicking && this.placeCooldown <= 0) {
 
         this.crouching = Shift;
 
+this.prevEyeHeight = this.eyeHeight;
+
+const target = this.crouching ? 1.27 : 1.62;
+this.eyeHeight += (target - this.eyeHeight) * 0.5;
+        
         if (R && onlyW) {
             this.sprinting = true;
         }
